@@ -181,6 +181,37 @@ export class HudUI{
     const btnCloseCore=document.getElementById("btn-close-core-dao");
     btnCloseCore&&btnCloseCore.addEventListener("click",()=>this.closeCoreDaoModal());
 
+    let deferredPwaPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPwaPrompt = e;
+      const btnInstall = document.getElementById("btn-install-pwa");
+      if (btnInstall) btnInstall.style.display = "flex";
+    });
+
+    const btnInstallPwa = document.getElementById("btn-install-pwa");
+    btnInstallPwa&&btnInstallPwa.addEventListener("click", async () => {
+      if (deferredPwaPrompt) {
+        deferredPwaPrompt.prompt();
+        const { outcome } = await deferredPwaPrompt.userChoice;
+        if (outcome === 'accepted') {
+          this.showTimingPopup({grade: "APP INSTALLED", detail: "Ready for Offline Play!", durationMs: 2000});
+        }
+        deferredPwaPrompt = null;
+      } else {
+        // Fallback: Export save and provide offline instruction
+        const prog=this.getCoreProgress();
+        const dataStr="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(prog,null,2));
+        const dlAnchor=document.createElement('a');
+        dlAnchor.setAttribute("href",dataStr);
+        dlAnchor.setAttribute("download",`core_dao_tennis_save_${Date.now()}.json`);
+        document.body.appendChild(dlAnchor);
+        dlAnchor.click();
+        dlAnchor.remove();
+        alert("To play offline anytime: In Chrome/Edge, click the browser menu (⋮) -> 'Install Argon Tennis' or 'Add to Home Screen'. Your progress is saved locally!");
+      }
+    });
+
     const btnDownload=document.getElementById("btn-download-game");
     btnDownload&&btnDownload.addEventListener("click",()=>{
       const prog=this.getCoreProgress();
