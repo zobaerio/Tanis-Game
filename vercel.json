@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://argon-tennis-sandbox-170440.uc.r.appspot.com/api/:path*"
+    }
+  ]
+}
