@@ -28,6 +28,9 @@ export class HudUI{
     this.currentTunnelUrl="https://argon-tennis-sandbox-170440.uc.r.appspot.com";
     this.elTitleModal=document.getElementById("title-modal");
     this.elCoreDaoModal=document.getElementById("core-dao-modal");
+    this.elCharacterModal=document.getElementById("character-modal");
+    this.elSettingsModal=document.getElementById("settings-modal");
+    this.elAchievementsModal=document.getElementById("achievements-modal");
     this.elCompanionModal=document.getElementById("companion-modal");
     this.elVictoryModal=document.getElementById("victory-modal");
     this.elScoreCenter=document.getElementById("score-center-display");
@@ -60,6 +63,7 @@ export class HudUI{
     this._lastRoomStatus={};
     this._lastOtherReady=!1;
     this._justJoinedTimer=null;
+    this._loadUserSettings();
     this._renderAllMiiPortraits();
     this._bindEvents();
     this._initUrlParamsState();
@@ -68,6 +72,39 @@ export class HudUI{
 
   _renderAllMiiPortraits(){P()}
   _drawMiiFace(t,n={}){L(t,n.characterId||t?.id||"player1",n)}
+
+  _loadUserSettings(){
+    try{
+      const s = JSON.parse(localStorage.getItem("argon_user_settings")||"{}");
+      if(s.tint){
+        document.querySelectorAll(".char-tint-choice").forEach(b=>{
+          b.classList.toggle("selected", b.dataset.tint === s.tint);
+        });
+      }
+      if(s.skin){
+        document.querySelectorAll(".racket-skin-choice").forEach(b=>{
+          b.classList.toggle("selected", b.dataset.skin === s.skin);
+        });
+      }
+      if(s.gfx){
+        document.querySelectorAll(".gfx-choice").forEach(b=>{
+          b.classList.toggle("selected", b.dataset.gfx === s.gfx);
+        });
+      }
+      const vol = document.getElementById("settings-volume");
+      if(vol && s.volume !== undefined) vol.value = s.volume;
+    }catch{}
+  }
+
+  _saveUserSettings(){
+    try{
+      const activeTint = document.querySelector(".char-tint-choice.selected")?.dataset.tint || "player-tint";
+      const activeSkin = document.querySelector(".racket-skin-choice.selected")?.dataset.skin || "gold";
+      const activeGfx = document.querySelector(".gfx-choice.selected")?.dataset.gfx || "high";
+      const vol = document.getElementById("settings-volume")?.value || "0.8";
+      localStorage.setItem("argon_user_settings", JSON.stringify({tint: activeTint, skin: activeSkin, gfx: activeGfx, volume: parseFloat(vol)}));
+    }catch{}
+  }
 
   _initUrlParamsState(){
     const t=new URLSearchParams(window.location.search);
@@ -93,7 +130,7 @@ export class HudUI{
     try{localStorage.setItem("core_dao_tennis_save",JSON.stringify(p));}catch{}
   }
 
-  renderCoreDaoGrid(){
+  renderCoreDaoGrid(filter=""){
     const grid=document.getElementById("core-levels-grid");
     if(!grid)return;
     const prog=this.getCoreProgress();
@@ -105,7 +142,11 @@ export class HudUI{
     if(starsEl)starsEl.textContent=`⭐ ${totalStars} / 150 Stars`;
 
     grid.innerHTML="";
+    const q = filter.trim().toLowerCase();
     CORE_DAO_LEVELS.forEach(lvl=>{
+      if(q && !lvl.name.toLowerCase().includes(q) && !lvl.opponent.toLowerCase().includes(q) && !String(lvl.level).includes(q)){
+        return;
+      }
       const isUnlocked=lvl.level<=(prog.unlockedLevel||1);
       const lvlData=prog.levels?.[lvl.level]||{};
       const stars=lvlData.stars||0;
@@ -135,9 +176,55 @@ export class HudUI{
     this.renderCoreDaoGrid();
     if(this.elCoreDaoModal)this.elCoreDaoModal.classList.remove("hidden");
   }
-
   closeCoreDaoModal(){
     if(this.elCoreDaoModal)this.elCoreDaoModal.classList.add("hidden");
+  }
+
+  openCharacterModal(){
+    if(this.elCharacterModal)this.elCharacterModal.classList.remove("hidden");
+  }
+  closeCharacterModal(){
+    this._saveUserSettings();
+    if(this.elCharacterModal)this.elCharacterModal.classList.add("hidden");
+  }
+
+  openSettingsModal(){
+    if(this.elSettingsModal)this.elSettingsModal.classList.remove("hidden");
+  }
+  closeSettingsModal(){
+    this._saveUserSettings();
+    if(this.elSettingsModal)this.elSettingsModal.classList.add("hidden");
+  }
+
+  openAchievementsModal(){
+    const prog = this.getCoreProgress();
+    let totalStars = 0;
+    Object.values(prog.levels||{}).forEach(l=>{totalStars+=(l.stars||0);});
+    
+    const ach1 = document.getElementById("ach-1-status");
+    const ach2 = document.getElementById("ach-2-status");
+    const ach3 = document.getElementById("ach-3-status");
+    
+    if(ach1) {
+      const ok = (prog.tokens||0) >= 500;
+      ach1.textContent = ok ? "UNLOCKED" : `${prog.tokens||0}/500`;
+      ach1.style.color = ok ? "#4ade80" : "#94a3b8";
+    }
+    if(ach2) {
+      const ok = totalStars >= 50;
+      ach2.textContent = ok ? "UNLOCKED" : `${totalStars}/50`;
+      ach2.style.color = ok ? "#4ade80" : "#94a3b8";
+    }
+    if(ach3) {
+      const ok = (prog.levels?.[50]?.completed);
+      ach3.textContent = ok ? "UNLOCKED" : "LOCKED";
+      ach3.style.color = ok ? "#4ade80" : "#94a3b8";
+    }
+
+    if(this.elAchievementsModal)this.elAchievementsModal.classList.remove("hidden");
+  }
+  closeAchievementsModal(){
+    if(this.elAchievementsModal)this.elAchievementsModal.classList.add("hidden");
   }
 
   _setDifficultySelection(t,{notify:n=!0}={}){
@@ -181,6 +268,59 @@ export class HudUI{
     const btnCloseCore=document.getElementById("btn-close-core-dao");
     btnCloseCore&&btnCloseCore.addEventListener("click",()=>this.closeCoreDaoModal());
 
+    const searchInput = document.getElementById("level-search-input");
+    searchInput&&searchInput.addEventListener("input",(e)=>{
+      this.renderCoreDaoGrid(e.target.value);
+    });
+
+    const btnOpenChar=document.getElementById("btn-open-character");
+    btnOpenChar&&btnOpenChar.addEventListener("click",()=>this.openCharacterModal());
+    const btnCloseChar=document.getElementById("btn-close-character");
+    btnCloseChar&&btnCloseChar.addEventListener("click",()=>this.closeCharacterModal());
+
+    document.querySelectorAll(".char-tint-choice").forEach(b=>{
+      b.addEventListener("click",()=>{
+        document.querySelectorAll(".char-tint-choice").forEach(x=>x.classList.remove("selected"));
+        b.classList.add("selected");
+        this._saveUserSettings();
+      });
+    });
+
+    document.querySelectorAll(".racket-skin-choice").forEach(b=>{
+      b.addEventListener("click",()=>{
+        document.querySelectorAll(".racket-skin-choice").forEach(x=>x.classList.remove("selected"));
+        b.classList.add("selected");
+        this._saveUserSettings();
+      });
+    });
+
+    const btnOpenSets=document.getElementById("btn-open-settings");
+    btnOpenSets&&btnOpenSets.addEventListener("click",()=>this.openSettingsModal());
+    const btnCloseSets=document.getElementById("btn-close-settings");
+    btnCloseSets&&btnCloseSets.addEventListener("click",()=>this.closeSettingsModal());
+
+    document.querySelectorAll(".gfx-choice").forEach(b=>{
+      b.addEventListener("click",()=>{
+        document.querySelectorAll(".gfx-choice").forEach(x=>x.classList.remove("selected"));
+        b.classList.add("selected");
+        this._saveUserSettings();
+      });
+    });
+
+    const btnResetSave=document.getElementById("btn-reset-save");
+    btnResetSave&&btnResetSave.addEventListener("click",()=>{
+      if(confirm("Are you sure you want to reset all campaign progress and saved data?")){
+        localStorage.removeItem("core_dao_tennis_save");
+        this.showTimingPopup({grade:"PROGRESS RESET",detail:"Campaign data cleared.",durationMs:2000});
+        this.renderCoreDaoGrid();
+      }
+    });
+
+    const btnOpenAch=document.getElementById("btn-open-achievements");
+    btnOpenAch&&btnOpenAch.addEventListener("click",()=>this.openAchievementsModal());
+    const btnCloseAch=document.getElementById("btn-close-achievements");
+    btnCloseAch&&btnCloseAch.addEventListener("click",()=>this.closeAchievementsModal());
+
     let deferredPwaPrompt = null;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
@@ -199,7 +339,6 @@ export class HudUI{
         }
         deferredPwaPrompt = null;
       } else {
-        // Fallback: Export save and provide offline instruction
         const prog=this.getCoreProgress();
         const dataStr="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(prog,null,2));
         const dlAnchor=document.createElement('a');
@@ -329,121 +468,72 @@ export class HudUI{
     e.fillStyle="#ffea28";
     e.beginPath();e.arc(r,m,6,0,Math.PI*2);e.fill();
     e.strokeStyle="#006cc4";
-    e.lineWidth=2.5;
-    e.stroke()
-  }
-
-  configureGameBubbles(t=2){
-    [this.elGamesPlayer,this.elGamesOpponent].forEach(n=>{
-      if(!n)return;
-      n.querySelectorAll(".game-bubble").forEach((i,o)=>{o<Math.max(1,t)?i.classList.remove("hidden"):i.classList.add("hidden")})
-    })
-  }
-
-  updateScoreboard({playerScoreText:t="00",opponentScoreText:n="00",deuceLabel:e=null,playerGames:i=0,opponentGames:o=0,gamesToWin:s=2}){
-    this.elScoreCenter&&(e?(this.elScoreCenter.classList.add("deuce-mode"),this.elScorePlayer.textContent=e,this.elScoreSep.classList.add("hidden"),this.elScoreOpponent.classList.add("hidden")):(this.elScoreCenter.classList.remove("deuce-mode"),this.elScorePlayer.textContent=t,this.elScoreSep.classList.remove("hidden"),this.elScoreOpponent.classList.remove("hidden"),this.elScoreOpponent.textContent=n),this.configureGameBubbles(s),this.elGamesPlayer&&this.elGamesPlayer.querySelectorAll(".game-bubble").forEach((r,m)=>r.classList.toggle("won",m<i)),this.elGamesOpponent&&this.elGamesOpponent.querySelectorAll(".game-bubble").forEach((r,m)=>r.classList.toggle("won",m<o)))
-  }
-
-  updateServerTag(t,n){
-    if(!this.elServerTag)return;
-    if(!n||!t||!t.visible){this.elServerTag.classList.add("hidden");return}
-    this.elServerTag.classList.remove("hidden");
-    const e=Math.max(80,Math.min(window.innerWidth-80,t.x)),i=Math.max(95,Math.min(window.innerHeight-90,t.y));
-    this.elServerTag.style.left=`${e.toFixed(1)}px`;
-    this.elServerTag.style.top=`${i.toFixed(1)}px`
-  }
-
-  updatePlayerNameplate(t,n){
-    if(!this.elPlayerNameplate)return;
-    if(!n||!t||!t.visible){this.elPlayerNameplate.classList.add("hidden");return}
-    this.elPlayerNameplate.classList.remove("hidden");
-    const e=Math.max(90,Math.min(window.innerWidth-90,t.x)),i=Math.max(120,Math.min(window.innerHeight-50,t.y));
-    this.elPlayerNameplate.style.left=`${e.toFixed(1)}px`;
-    this.elPlayerNameplate.style.top=`${i.toFixed(1)}px`
-  }
-
-  showTimingPopup({grade:t="PERFECT",detail:n="POWER TOPSPIN • 176 KM/H",screenPos:e=null,durationMs:i=1100}){
-    if(this.elTimingPopup){
-      if(this.timingPopupTimer&&clearTimeout(this.timingPopupTimer),this.elTimingGrade.textContent=t,this.elTimingGrade.className="timing-grade",t.includes("EARLY")?this.elTimingGrade.classList.add("grade-early"):t.includes("LATE")?this.elTimingGrade.classList.add("grade-late"):this.elTimingGrade.classList.add("grade-perfect"),this.elTimingDetail.textContent=n,e&&e.visible){
-        const o=Math.max(110,Math.min(window.innerWidth-110,e.x)),s=Math.max(110,Math.min(window.innerHeight-120,e.y));
-        this.elTimingPopup.style.left=`${o.toFixed(1)}px`;
-        this.elTimingPopup.style.top=`${s.toFixed(1)}px`
-      }else{this.elTimingPopup.style.left="50%",this.elTimingPopup.style.top="54%"}
-      this.elTimingPopup.classList.remove("hidden");
-      i>0&&(this.timingPopupTimer=setTimeout(()=>{this.elTimingPopup.classList.add("hidden")},i))
-    }
-  }
-
-  showCenterBanner(t,{style:n="style-gold",subText:e="",durationMs:i=1500,persistent:o=!1}={}){
-    !this.elBannerLayer||!this.elBannerText||(this.bannerTimer&&(clearTimeout(this.bannerTimer),this.bannerTimer=null),this.elBannerText.textContent=t,this.elBannerText.className=`center-banner-text ${n}`,this.elBannerSub&&(e?(this.elBannerSub.textContent=e,this.elBannerSub.classList.remove("hidden")):this.elBannerSub.classList.add("hidden")),this.elBannerLayer.classList.remove("hidden"),!o&&i>0&&(this.bannerTimer=setTimeout(()=>{this.hideCenterBanner()},i)))
-  }
-
-  hideCenterBanner(){
-    this.bannerTimer&&(clearTimeout(this.bannerTimer),this.bannerTimer=null);
-    this.elBannerLayer&&this.elBannerLayer.classList.add("hidden")
-  }
-
-  setReplayMode(t){
-    document.body.classList.toggle("replay-mode",!!t);
-    this.elReplayBadge&&this.elReplayBadge.classList.toggle("hidden",!t)
-  }
-
-  setActiveShotChip(t){}
-
-  updateTimingGauge({cursorNormalized:t=.5,modeTitle:n="SWING TIMING",speedText:e="READY"}){
-    if(this.elTimingCursor){const i=Math.max(4,Math.min(96,t*100));this.elTimingCursor.style.left=`${i.toFixed(1)}%`}
-    this.elGaugeModeTitle&&(this.elGaugeModeTitle.textContent=n);
-    this.elGaugeSpeedReadout&&(this.elGaugeSpeedReadout.textContent=e)
-  }
-
-  updateAudioStatus({playing:t,trackName:n}){
-    this.elAudioDot&&this.elAudioDot.classList.toggle("music-on",!!t);
-    this.elAudioLabel&&(this.elAudioLabel.textContent=t?`Lyria: ${n||"Sunny Rally"}`:"Lyria: Muted")
-  }
-
-  updateCameraLabel(t){this.elCameraLabel&&(this.elCameraLabel.textContent=t)}
-
-  updateMotionStatus({webcamActive:t=!1,phoneConnected:n=!1,p1Phone:e=!1,p2Phone:i=!1}){
-    this.elWebcamPip&&this.elWebcamPip.classList.toggle("hidden",!t);
-    this.elWebcamDot&&this.elWebcamDot.classList.toggle("active",!!t);
-    this.elPhoneDot&&this.elPhoneDot.classList.toggle("active",!!(n||e||i));
-    this.elPhoneLabel&&(e&&i?this.elPhoneLabel.textContent="P1 & P2 Rackets":n||e||i?this.elPhoneLabel.textContent="Racket Connected":this.elPhoneLabel.textContent="Pocket Racket")
+    e.lineWidth=2;
+    e.stroke();
   }
 
   updateMultiplayerRoomInfo(t={}){
-    const n={...this._lastRoomStatus||{},...t};
-    if(this._lastRoomStatus=n,n.roomId&&(this.currentRoomId=String(n.roomId).toLowerCase()),n.role&&(this.playerRole=String(n.role).toLowerCase()==="p2"?"p2":"p1"),n.tunnelUrl){
-      this.currentTunnelUrl=String(n.tunnelUrl).replace(/\/+$/,"");
-      const d=document.getElementById("tunnel-url-input");
-      d&&document.activeElement!==d&&(d.value=this.currentTunnelUrl)
+    this.currentRoomId=t.roomId||this.currentRoomId;
+    this.currentTunnelUrl=t.tunnelUrl||this.currentTunnelUrl;
+    const n=document.getElementById("companion-qr");
+    if(n&&this.currentTunnelUrl){
+      n.src=`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${this.currentTunnelUrl}/companion.html?room=${this.currentRoomId}&role=p1`)}`;
     }
-    const e=this.playerRole==="p2",i=document.getElementById("mp-card-p1"),o=document.getElementById("mp-card-p2"),s=document.getElementById("mp-gchat-invite-box"),a=document.getElementById("btn-create-1v1-room");
-    i&&i.classList.toggle("hidden",e);o&&o.classList.toggle("hidden",!e);s&&s.classList.toggle("hidden",e);a&&a.classList.toggle("hidden",e);
-    const r=document.getElementById("companion-room-badge");
-    r&&(r.textContent=`ROOM #${this.currentRoomId.toUpperCase()} • ${e?"PLAYER 2":"PLAYER 1"}`);
-    const m=encodeURIComponent(this.currentRoomId),p=(this.currentTunnelUrl||window.location.origin).replace(/\/+$/,"");
-    const g=`${p}/companion.html?room=${m}&role=p1`,y=`${p}/companion.html?room=${m}&role=p2`;
-    const f=document.getElementById("companion-link");f&&(f.href=g);
-    const I=document.getElementById("companion-link-p2");I&&(I.href=y);
-    const b=document.getElementById("companion-qr");
-    if(b){const d="https://www.gstatic.com/aistudio/starter-apps/tennis/qr/player1_qr.png";b.dataset.lastSrc!==d&&(b.src=d,b.dataset.lastSrc=d)}
-    const B=document.getElementById("companion-qr-p2");
-    if(B){const d="https://www.gstatic.com/aistudio/starter-apps/tennis/qr/player2_qr.png";B.dataset.lastSrc!==d&&(B.src=d,B.dataset.lastSrc=d)}
-    this.updateOpponentPresence(n)
+    const e=document.getElementById("companion-link");
+    if(e&&this.currentTunnelUrl){
+      e.href=`/companion.html?room=${this.currentRoomId}&role=p1`;
+    }
   }
 
   updateOpponentPresence(t={}){
-    const n=!!(t.isMultiplayer||this.selectedDifficulty==="1v1"||this.currentRoomId&&this.currentRoomId!=="default");
-    const e=document.querySelector(".mii-side-opponent .mii-avatar-badge:not(.secondary-mii)");
-    if(!n){this.elOpponentPresencePill&&this.elOpponentPresencePill.classList.add("hidden");e&&e.classList.remove("opponent-ready");this._lastOtherReady=!1;return}
-    const i=t.hostName&&t.hostName.trim()?t.hostName.trim():"Player 1",o=t.guestName&&t.guestName.trim()?t.guestName.trim():"Player 2",s=this.playerRole==="p2";
-    let a=!1,r="";
-    s?(a=!!(t.p2Phone||t.p1Phone||t.p1Online),t.p2Phone?r=`Racket Ready • ${i} Joined`:t.p1Phone||t.p1Online?r=`${i} Ready • Scan QR`:r=`Waiting for ${i}…`):(a=!!(t.p2Phone||t.p2Online),t.p2Phone&&t.p2Online?r=`${o} Connected • Ready!`:t.p2Phone?r=`${o}'s Racket Ready`:t.p2Online?r=`${o} Joined`:r=`Waiting for ${o}…`);
-    this.elOpponentPresencePill&&(this.elOpponentPresencePill.classList.remove("hidden"),this.elOpponentPresencePill.classList.toggle("ready",a),this.elOpponentPresencePill.classList.toggle("in-rally",!!t.inRally),a&&!this._lastOtherReady&&(this.elOpponentPresencePill.classList.remove("just-joined"),this.elOpponentPresencePill.offsetWidth,this.elOpponentPresencePill.classList.add("just-joined"),this._justJoinedTimer&&clearTimeout(this._justJoinedTimer),this._justJoinedTimer=setTimeout(()=>{this.elOpponentPresencePill&&this.elOpponentPresencePill.classList.remove("just-joined")},950)));
-    this.elOpponentPresenceText&&(this.elOpponentPresenceText.textContent=r);
-    e&&e.classList.toggle("opponent-ready",a);
-    const m=document.getElementById("setup-opponent-label");
-    m&&this.selectedDifficulty==="1v1"&&!s&&(m.textContent=a?`🟢 ${o} Ready`:o);
-    this._lastOtherReady=a
+    this._lastRoomStatus=t;
+    const n=document.getElementById("opponent-presence-pill");
+    const e=document.getElementById("opponent-presence-text");
+    if(!n||!e)return;
+    if(this.selectedDifficulty==="1v1"){
+      n.classList.remove("hidden");
+      if(t.p2PhoneConnected||t.p2Online){
+        n.classList.add("ready");
+        e.textContent="Player 2 Connected!";
+      }else{
+        n.classList.remove("ready");
+        e.textContent=`Waiting for Player 2 (Room: ${this.currentRoomId})…`;
+      }
+    }else{
+      n.classList.add("hidden");
+    }
+  }
+
+  showTimingPopup(opts={}){
+    const t=opts.grade||"PERFECT";
+    const n=opts.detail||"";
+    const durationMs=opts.durationMs||1200;
+    if(!this.elTimingPopup)return;
+    if(this.timingPopupTimer)clearTimeout(this.timingPopupTimer);
+    this.elTimingGrade.textContent=t;
+    this.elTimingGrade.className=`timing-grade grade-${t.toLowerCase()}`;
+    this.elTimingDetail.textContent=n;
+    this.elTimingPopup.classList.remove("hidden");
+    this.timingPopupTimer=setTimeout(()=>{
+      this.elTimingPopup.classList.add("hidden");
+    },durationMs);
+  }
+
+  configureGameBubbles(gamesToWin){
+    [this.elGamesPlayer,this.elGamesOpponent].forEach(pill=>{
+      if(!pill)return;
+      const bubbles = pill.querySelectorAll(".game-bubble");
+      bubbles.forEach((b, idx)=>{
+        if(gamesToWin === 1){
+          if(idx === 0) b.classList.remove("hidden");
+          else b.classList.add("hidden");
+        } else if(gamesToWin === 2){
+          if(idx < 2) b.classList.remove("hidden");
+          else b.classList.add("hidden");
+        } else {
+          b.classList.remove("hidden");
+        }
+      });
+    });
   }
 }
